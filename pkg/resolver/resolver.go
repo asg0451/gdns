@@ -7,6 +7,8 @@ import (
 	"gdns/pkg/protocol"
 	"net"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func Query(ctx context.Context, q protocol.Query) (*int, error) {
@@ -34,21 +36,10 @@ func Query(ctx context.Context, q protocol.Query) (*int, error) {
 	}
 
 	rdr := bytes.NewReader(resp)
-	header, err := protocol.ParseHeader(rdr)
+	packet, err := protocol.ParsePacket(rdr)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling response.header: %w", err)
+		return nil, fmt.Errorf("parsing packet: %w", err)
 	}
-	fmt.Printf("header: %+v\n", header)
-	question, err := protocol.ParseQuestion(rdr)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshalling response.question: %w", err)
-	}
-	fmt.Printf("question: %+v\n", question)
-	record, err := protocol.ParseRecord(rdr)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshalling response.record: %w", err)
-	}
-	fmt.Printf("record: %+v\n", record)
-
+	spew.Dump(packet)
 	return nil, nil
 }

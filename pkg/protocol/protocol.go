@@ -92,7 +92,8 @@ type protocolReader interface {
 	io.Seeker
 }
 
-// TODO: api? also is this right
+// TODO: api
+// TODO: make less corecursive and weird, tighten
 func decodeName(rdr protocolReader) (string, error) {
 	var (
 		length byte
@@ -175,8 +176,8 @@ const (
 )
 
 type Query struct {
-	Header   Header
-	Question Question
+	Header   *Header
+	Question *Question
 }
 
 func (q *Query) MarshalBinary() ([]byte, error) {
@@ -203,12 +204,12 @@ func (q *Query) MarshalBinary() ([]byte, error) {
 
 func NewQuery(name string, recordType RecordType) Query {
 	return Query{
-		Header: Header{
+		Header: &Header{
 			Id:           uint16(rand.Intn(65535)),
 			Flags:        FlagRecursionDesired,
 			NumQuestions: 1,
 		},
-		Question: Question{
+		Question: &Question{
 			Name:  name,
 			Type:  recordType,
 			Class: ClassIn,
@@ -272,6 +273,56 @@ func ParseRecord(rdr protocolReader) (*Record, error) {
 	}
 
 	return r, nil
+}
+
+type Packet struct {
+	Header      *Header
+	Questions   []*Question
+	Answers     []*Record
+	Authorities []*Record
+	Additionals []*Record
+}
+
+func (p *Packet) MarshalBinary() ([]byte, error) {
+	panic("not implemented")
+}
+
+func ParsePacket(rdr protocolReader) (*Packet, error) {
+	var err error
+	p := &Packet{}
+	if p.Header, err = ParseHeader(rdr); err != nil {
+		return nil, fmt.Errorf("parsing header: %w", err)
+	}
+	for i := 0; i < int(p.Header.NumQuestions); i++ {
+		q, err := ParseQuestion(rdr)
+		if err != nil {
+			return nil, fmt.Errorf("parsing question: %w", err)
+		}
+		p.Questions = append(p.Questions, q)
+	}
+	for i := 0; i < int(p.Header.NumAnswers); i++ {
+		rec, err := ParseRecord(rdr)
+		if err != nil {
+			return nil, fmt.Errorf("parsing answer: %w", err)
+		}
+		p.Answers = append(p.Answers, rec)
+	}
+	for i := 0; i < int(p.Header.NumAuthorities); i++ {
+		rec, err := ParseRecord(rdr)
+		if err != nil {
+			return nil, fmt.Errorf("parsing authority: %w", err)
+		}
+		p.Authorities = append(p.Authorities, rec)
+	}
+	for i := 0; i < int(p.Header.NumAdditionals); i++ {
+		rec, err := ParseRecord(rdr)
+		if err != nil {
+			return nil, fmt.Errorf("parsing additional: %w", err)
+		}
+		p.Additionals = append(p.Additionals, rec)
+	}
+
+	return p, nil
 }
 
 // H: 2 bytes (as an integer)
