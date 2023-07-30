@@ -22,7 +22,7 @@ func TestMarshal(t *testing.T) {
 	require.NoError(t, err)
 	printBytes(bs)
 
-	nm := NewName("google.com")
+	nm := "google.com"
 
 	q := Question{
 		Name:  nm,
@@ -32,8 +32,6 @@ func TestMarshal(t *testing.T) {
 	bs, err = q.MarshalBinary()
 	require.NoError(t, err)
 	printBytes(bs)
-
-	printBytes(nm)
 
 	query := NewQuery("www.example.com", RecordTypeA)
 	fmt.Printf("%+#v\n", query)

@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"gdns/pkg/protocol"
@@ -26,11 +27,28 @@ func Query(ctx context.Context, q protocol.Query) (*int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("writing query: %w", err)
 	}
-	resp := make([]byte, 512)
+	resp := make([]byte, 512) // TODO: read more than length, multiple etc
 	_, err = conn.Read(resp)
 	if err != nil {
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
-	fmt.Printf("%#v\n", string(resp))
+
+	rdr := bytes.NewReader(resp)
+	header, err := protocol.ParseHeader(rdr)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling response.header: %w", err)
+	}
+	fmt.Printf("header: %+v\n", header)
+	question, err := protocol.ParseQuestion(rdr)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling response.question: %w", err)
+	}
+	fmt.Printf("question: %+v\n", question)
+	record, err := protocol.ParseRecord(rdr)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling response.record: %w", err)
+	}
+	fmt.Printf("record: %+v\n", record)
+
 	return nil, nil
 }
