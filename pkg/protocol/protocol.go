@@ -93,7 +93,7 @@ type protocolReader interface {
 }
 
 // TODO: api? also is this right
-gfunc decodeName(rdr protocolReader) (string, error) {
+func decodeName(rdr protocolReader) (string, error) {
 	var (
 		length byte
 		err    error
@@ -102,7 +102,7 @@ gfunc decodeName(rdr protocolReader) (string, error) {
 	)
 	for length, err = rdr.ReadByte(); err == nil && length > 0; length, err = rdr.ReadByte() {
 		if length&0b1100_0000 > 0 { // compressed
-			if err := decodeCompressedNameInto(length, rdr, parts); err != nil {
+			if err := decodeCompressedNameInto(length, rdr, &parts); err != nil {
 				return "", fmt.Errorf("decoding compressed name: %w", err)
 			}
 		} else {
@@ -124,7 +124,7 @@ gfunc decodeName(rdr protocolReader) (string, error) {
 	return strings.Join(parts, "."), nil
 }
 
-func decodeCompressedNameInto(length byte, rdr protocolReader, parts []string) error {
+func decodeCompressedNameInto(length byte, rdr protocolReader, parts *[]string) error {
 	next, err := rdr.ReadByte()
 	if err != nil {
 		return fmt.Errorf("reading next byte for ptr: %w", err)
@@ -153,7 +153,7 @@ func decodeCompressedNameInto(length byte, rdr protocolReader, parts []string) e
 	if _, err := rdr.Seek(current, io.SeekStart); err != nil {
 		return fmt.Errorf("seeking back: %w", err)
 	}
-	parts = append(parts, name)
+	*parts = append(*parts, name)
 
 	return nil
 }
