@@ -25,7 +25,7 @@ func TestMarshal(t *testing.T) {
 	nm := "google.com"
 
 	q := Question{
-		Name:  nm,
+		Name:  name(nm),
 		Type:  1,
 		Class: 1,
 	}

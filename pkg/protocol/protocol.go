@@ -37,8 +37,27 @@ func ParseHeader(rdr protocolReader) (*Header, error) {
 	return h, nil
 }
 
+type name string
+
+func (n name) MarshalBinary() ([]byte, error) {
+	encoded := make([]byte, 0, len(n))
+	for _, part := range strings.Split(string(n), ".") {
+		encoded = append(encoded, byte(len(part)))
+		encoded = append(encoded, []byte(part)...)
+	}
+	return append(encoded, 0), nil
+}
+
+func ParseName(rdr protocolReader) (name, error) {
+	n, err := decodeName(rdr)
+	if err != nil {
+		return "", fmt.Errorf("decoding name: %w", err)
+	}
+	return name(n), nil
+}
+
 type Question struct {
-	Name  string
+	Name  name
 	Type  RecordType
 	Class uint16
 }
@@ -46,8 +65,11 @@ type Question struct {
 func (q *Question) MarshalBinary() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
-	// write name, then rest
-	if _, err := buf.Write(encodeName(q.Name)); err != nil {
+	bs, err := q.Name.MarshalBinary()
+	if err != nil {
+		return []byte{}, fmt.Errorf("marshalling name: %w", err)
+	}
+	if _, err := buf.Write(bs); err != nil {
 		return []byte{}, fmt.Errorf("writing name: %w", err)
 	}
 
@@ -64,7 +86,7 @@ func (q *Question) MarshalBinary() ([]byte, error) {
 func ParseQuestion(rdr protocolReader) (*Question, error) {
 	var err error
 	q := &Question{}
-	if q.Name, err = decodeName(rdr); err != nil {
+	if q.Name, err = ParseName(rdr); err != nil {
 		return nil, fmt.Errorf("reading name: %w", err)
 	}
 	if err = binary.Read(rdr, binary.BigEndian, &q.Type); err != nil {
@@ -75,15 +97,6 @@ func ParseQuestion(rdr protocolReader) (*Question, error) {
 	}
 
 	return q, nil
-}
-
-func encodeName(name string) []byte {
-	encoded := make([]byte, 0, len(name))
-	for _, part := range strings.Split(name, ".") {
-		encoded = append(encoded, byte(len(part)))
-		encoded = append(encoded, []byte(part)...)
-	}
-	return append(encoded, 0)
 }
 
 type protocolReader interface {
@@ -202,7 +215,7 @@ func (q *Query) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func NewQuery(name string, recordType RecordType) Query {
+func NewQuery(nam string, recordType RecordType) Query {
 	return Query{
 		Header: &Header{
 			Id:           uint16(rand.Intn(65535)),
@@ -210,7 +223,7 @@ func NewQuery(name string, recordType RecordType) Query {
 			NumQuestions: 1,
 		},
 		Question: &Question{
-			Name:  name,
+			Name:  name(nam),
 			Type:  recordType,
 			Class: ClassIn,
 		},
@@ -218,7 +231,7 @@ func NewQuery(name string, recordType RecordType) Query {
 }
 
 type Record struct {
-	Name  string
+	Name  name
 	Type  uint16
 	Class uint16
 	TTL   uint16
@@ -227,7 +240,11 @@ type Record struct {
 
 func (r *Record) MarshalBinary() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	if _, err := buf.Write(encodeName(r.Name)); err != nil {
+	bs, err := r.Name.MarshalBinary()
+	if err != nil {
+		return []byte{}, fmt.Errorf("marshalling name: %w", err)
+	}
+	if _, err := buf.Write(bs); err != nil {
 		return []byte{}, fmt.Errorf("writing record.name: %w", err)
 	}
 	if err := binary.Write(buf, binary.BigEndian, r.Type); err != nil {
@@ -251,7 +268,7 @@ func (r *Record) MarshalBinary() ([]byte, error) {
 func ParseRecord(rdr protocolReader) (*Record, error) {
 	var err error
 	r := &Record{}
-	if r.Name, err = decodeName(rdr); err != nil {
+	if r.Name, err = ParseName(rdr); err != nil {
 		return nil, fmt.Errorf("reading name: %w", err)
 	}
 	if err = binary.Read(rdr, binary.BigEndian, &r.Type); err != nil {
@@ -317,7 +334,7 @@ func ParsePacket(rdr protocolReader) (*Packet, error) {
 	for i := 0; i < int(p.Header.NumAdditionals); i++ {
 		rec, err := ParseRecord(rdr)
 		if err != nil {
-			return nil, fmt.Errorf("parsing additional: %w", err)
+			return nil, fmt.Errorf("parsing answer: %w", err)
 		}
 		p.Additionals = append(p.Additionals, rec)
 	}
