@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,11 +35,20 @@ func TestMarshal(t *testing.T) {
 
 	printBytes(nm)
 
-	query := NewQuery("google.com", RecordTypeA)
+	query := NewQuery("www.example.com", RecordTypeA)
 	fmt.Printf("%+#v\n", query)
 	bs, err = query.MarshalBinary()
 	require.NoError(t, err)
 	printBytes(bs)
+	fmt.Printf("%+#v\n", bs)
+
+	exp := []byte{
+		// first 2 bytes are random id; remove them
+		// 0x3c, 0x5f,
+		0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x03, 0x77, 0x77, 0x77, 0x07, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x03,
+		0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01}
+	assert.Equal(t, exp, bs[2:])
 }
 
 func printBytes(bs []byte) {
